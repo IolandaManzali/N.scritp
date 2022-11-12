@@ -14,9 +14,8 @@ import { NavigationEntry, AndroidActivityCallbacks } from '../ui/frame/frame-int
 import { Observable } from '../data/observable';
 
 import { profile } from '../profiling';
-import { initAccessibilityCssHelper } from '../accessibility/accessibility-css-helper';
-import { initAccessibilityFontScale } from '../accessibility/font-scale';
 import { inBackground, setInBackground, setSuspended, suspended } from './application-common';
+import { ad } from '../utils';
 
 const ActivityCreated = 'activityCreated';
 const ActivityDestroyed = 'activityDestroyed';
@@ -116,7 +115,7 @@ export class AndroidApplication extends Observable implements AndroidApplication
 
 	get systemAppearance(): 'light' | 'dark' {
 		if (!this._systemAppearance) {
-			const resources = this.context.getResources();
+			const resources = ad.getApplicationContext().getResources();
 			const configuration = <android.content.res.Configuration>resources.getConfiguration();
 
 			this._systemAppearance = getSystemAppearanceValue(configuration);
@@ -203,9 +202,6 @@ export function run(entry?: NavigationEntry | string) {
 		const nativeApp = getNativeApplication();
 		androidApp.init(nativeApp);
 	}
-
-	initAccessibilityCssHelper();
-	initAccessibilityFontScale();
 }
 
 export function addCss(cssText: string, attributeScoped?: boolean): void {
@@ -247,7 +243,7 @@ export function getRootView(): View {
 	ensureNativeApplication();
 	// Use start activity as a backup when foregroundActivity is still not set
 	// in cases when we are getting the root view before activity.onResumed event is fired
-	const activity = androidApp.foregroundActivity || androidApp.startActivity;
+	const activity = androidApp.startActivity;
 	if (!activity) {
 		return undefined;
 	}
@@ -373,18 +369,16 @@ function initLifecycleCallbacks() {
 	});
 
 	let activitiesStarted = 0;
-	let nativescriptActivity: androidx.appcompat.app.AppCompatActivity = undefined;
 
 	const lifecycleCallbacks = new android.app.Application.ActivityLifecycleCallbacks(<any>{
 		onActivityCreated: <any>profile('onActivityCreated', function (activity: androidx.appcompat.app.AppCompatActivity, savedInstanceState: android.os.Bundle) {
+			if (!androidApp.foregroundActivity) {
+				androidApp.foregroundActivity = activity;
+			}
 			setThemeOnLaunch(activity, undefined, undefined);
 
 			if (!androidApp.startActivity) {
 				androidApp.startActivity = activity;
-			}
-
-			if (!nativescriptActivity && (<any>activity)?.isNativeScriptActivity) {
-				nativescriptActivity = activity;
 			}
 
 			notifyActivityCreated(activity, <any>savedInstanceState, undefined);
@@ -399,17 +393,8 @@ function initLifecycleCallbacks() {
 				androidApp.foregroundActivity = undefined;
 			}
 
-			if (activity === nativescriptActivity) {
-				nativescriptActivity = undefined;
-			}
-
 			if (activity === androidApp.startActivity) {
 				androidApp.startActivity = undefined;
-
-				// Fallback for start activity when it is destroyed but we have a known nativescript activity
-				if (nativescriptActivity) {
-					androidApp.startActivity = nativescriptActivity;
-				}
 			}
 
 			androidApp.notify(<AndroidActivityEventData>{
