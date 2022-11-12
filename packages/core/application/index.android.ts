@@ -14,8 +14,9 @@ import { NavigationEntry, AndroidActivityCallbacks } from '../ui/frame/frame-int
 import { Observable } from '../data/observable';
 
 import { profile } from '../profiling';
+import { initAccessibilityCssHelper } from '../accessibility/accessibility-css-helper';
+import { initAccessibilityFontScale } from '../accessibility/font-scale';
 import { inBackground, setInBackground, setSuspended, suspended } from './application-common';
-import { ad } from '../utils';
 
 const ActivityCreated = 'activityCreated';
 const ActivityDestroyed = 'activityDestroyed';
@@ -115,7 +116,7 @@ export class AndroidApplication extends Observable implements AndroidApplication
 
 	get systemAppearance(): 'light' | 'dark' {
 		if (!this._systemAppearance) {
-			const resources = ad.getApplicationContext().getResources();
+			const resources = this.context.getResources();
 			const configuration = <android.content.res.Configuration>resources.getConfiguration();
 
 			this._systemAppearance = getSystemAppearanceValue(configuration);
@@ -202,6 +203,9 @@ export function run(entry?: NavigationEntry | string) {
 		const nativeApp = getNativeApplication();
 		androidApp.init(nativeApp);
 	}
+
+	initAccessibilityCssHelper();
+	initAccessibilityFontScale();
 }
 
 export function addCss(cssText: string, attributeScoped?: boolean): void {
@@ -243,7 +247,7 @@ export function getRootView(): View {
 	ensureNativeApplication();
 	// Use start activity as a backup when foregroundActivity is still not set
 	// in cases when we are getting the root view before activity.onResumed event is fired
-	const activity = androidApp.startActivity;
+	const activity = androidApp.foregroundActivity || androidApp.startActivity;
 	if (!activity) {
 		return undefined;
 	}
@@ -372,9 +376,6 @@ function initLifecycleCallbacks() {
 
 	const lifecycleCallbacks = new android.app.Application.ActivityLifecycleCallbacks(<any>{
 		onActivityCreated: <any>profile('onActivityCreated', function (activity: androidx.appcompat.app.AppCompatActivity, savedInstanceState: android.os.Bundle) {
-			if (!androidApp.foregroundActivity) {
-				androidApp.foregroundActivity = activity;
-			}
 			setThemeOnLaunch(activity, undefined, undefined);
 
 			if (!androidApp.startActivity) {
