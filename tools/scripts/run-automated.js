@@ -15,11 +15,12 @@ const spawned_process = spawn(
 	"npx",
 	[
 		"nx",
-		"run",
-		`apps-automated:${platform}`,
+		"debug",
+		`apps-automated`,
+		platform,
 		// "--log=trace",
 		// `--flags="--log=trace"`,
-		"--timeout=600" // 10 minutes, booting avds on CI is very slow...
+		`--timeout=${TIMEOUT_MS}`
 	],
 	{
 		cwd: workspaceDir,
